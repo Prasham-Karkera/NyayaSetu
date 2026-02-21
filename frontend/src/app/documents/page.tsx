@@ -114,7 +114,7 @@ export default function DocumentsPage() {
       formData.append("reset_db", (i === 0 && isNewChat).toString());
 
       try {
-        const response = await fetch("http://localhost:8001/docingest", {
+        const response = await fetch("http://localhost:8000/docingest", {
           method: "POST",
           body: formData,
         });
@@ -178,7 +178,7 @@ export default function DocumentsPage() {
     setQueryLoading(true);
 
     try {
-      const response = await fetch("http://localhost:8001/docquery", {
+      const response = await fetch("http://localhost:8000/docquery", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

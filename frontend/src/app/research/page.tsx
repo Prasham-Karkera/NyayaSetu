@@ -87,7 +87,7 @@ export default function ResearchPage() {
     setError(null);
 
     try {
-      const res = await fetch("http://localhost:8000/agent", {
+      const res = await fetch("http://localhost:8001/agent", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query: searchQuery }),

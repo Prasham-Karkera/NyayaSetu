@@ -24,7 +24,6 @@ agent = None  # Initialize as None, will be loaded when first needed
 #     # Cleanup (optional)
 
 
-
 # Initialize FastAPI app before using it
 app = FastAPI(title="Legal Diff Engine")
 
@@ -40,10 +39,13 @@ app.add_middleware(
 # ==========================================
 # 2. DATA MODELS
 # ==========================================
+
+
 class LegalRequest(BaseModel):
     law_type: str            # "IPC" or "BNS"
     section: str             # "33", "420", "2"
     subsection: Optional[str] = None  # "1", "a", or null
+
 
 class ComparisonResponse(BaseModel):
     status: str
@@ -51,20 +53,25 @@ class ComparisonResponse(BaseModel):
     related_nodes: List[Dict[str, Any]]
     analysis: Dict[str, Any]
 
+
 class AgentRequest(BaseModel):
     query: str
+
 
 class AgentResponse(BaseModel):
     status: str
     response: str
 
+
 class CaseLawSearchRequest(BaseModel):
     query: str
-    court: Optional[str] = None  # 'supremecourt', 'highcourts', 'tribunals', etc.
+    # 'supremecourt', 'highcourts', 'tribunals', etc.
+    court: Optional[str] = None
     from_date: Optional[str] = None  # Format: YYYY-MM-DD
     to_date: Optional[str] = None  # Format: YYYY-MM-DD
     sort_by: Optional[str] = "relevance"  # 'relevance', 'date', 'citations'
     max_results: Optional[int] = 10
+
 
 class CaseLawResponse(BaseModel):
     status: str
@@ -75,6 +82,7 @@ class CaseLawResponse(BaseModel):
 # 3. ENDPOINTS
 # ==========================================
 
+
 def get_agent():
     """Lazy initialization of the agent to avoid startup delays"""
     global agent
@@ -82,8 +90,10 @@ def get_agent():
         try:
             agent = GeminiLegalAgent()
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Failed to initialize legal agent: {str(e)}")
+            raise HTTPException(
+                status_code=500, detail=f"Failed to initialize legal agent: {str(e)}")
     return agent
+
 
 @app.post("/compare")
 async def compare_laws(request: LegalRequest):
@@ -111,6 +121,7 @@ async def compare_laws(request: LegalRequest):
 
     return result
 
+
 @app.post("/agent", response_model=AgentResponse)
 async def query_legal_agent(request: AgentRequest):
     """
@@ -120,18 +131,20 @@ async def query_legal_agent(request: AgentRequest):
     try:
         legal_agent = get_agent()
         response = legal_agent.query(request.query)
-        
+
         return AgentResponse(
             status="success",
             response=response
         )
-        
+
     except Exception as e:
         error_msg = str(e)
         if "rate limit" in error_msg.lower() or "413" in error_msg or "429" in error_msg:
-            raise HTTPException(status_code=429, detail="Rate limit exceeded. Please try again later.")
+            raise HTTPException(
+                status_code=429, detail="Rate limit exceeded. Please try again later.")
         else:
-            raise HTTPException(status_code=500, detail=f"Agent query failed: {error_msg}")
+            raise HTTPException(
+                status_code=500, detail=f"Agent query failed: {error_msg}")
 
 @app.post("/case-law/search", response_model=CaseLawResponse)
 async def search_case_law(request: CaseLawSearchRequest):
@@ -141,32 +154,33 @@ async def search_case_law(request: CaseLawSearchRequest):
     """
     try:
         if not request.query.strip():
-            raise HTTPException(status_code=400, detail="Query cannot be empty")
-        
+            raise HTTPException(
+                status_code=400, detail="Query cannot be empty")
+
         results = ik_api.search_legal_cases(
             query=request.query,
             court=request.court,
             max_cites=request.max_results or 10
         )
-        
+
         if not results or 'docs' not in results:
             return CaseLawResponse(
                 status="success",
                 cases=[],
                 total=0
             )
-        
+
         cases = []
         for doc in results['docs']:
             # Parse date for filtering
             doc_date = doc.get('publishdate', '')
-            
+
             # Apply date filters if provided
             if request.from_date and doc_date < request.from_date:
                 continue
             if request.to_date and doc_date > request.to_date:
                 continue
-            
+
             cases.append({
                 "id": doc.get('tid'),
                 "title": doc.get('title', 'Untitled'),
@@ -175,22 +189,24 @@ async def search_case_law(request: CaseLawSearchRequest):
                 "cite_count": doc.get('numcites', 0),
                 "link": f"https://indiankanoon.org/doc/{doc.get('tid')}/"
             })
-        
+
         # Apply sorting
         if request.sort_by == "date":
             cases.sort(key=lambda x: x['date'], reverse=True)
         elif request.sort_by == "citations":
             cases.sort(key=lambda x: x['cite_count'], reverse=True)
         # 'relevance' is default order from API
-        
+
         return CaseLawResponse(
             status="success",
             cases=cases,
             total=len(cases)
         )
-        
+
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Case law search failed: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Case law search failed: {str(e)}")
+
 
 @app.get("/case-law/document/{doc_id}")
 async def get_case_document(doc_id: int):
@@ -199,25 +215,31 @@ async def get_case_document(doc_id: int):
     """
     try:
         text = ik_api.get_clean_verdict_text(doc_id)
-        
+
         if "Error:" in text:
             raise HTTPException(status_code=404, detail="Document not found")
-        
+
         return {
             "status": "success",
             "doc_id": doc_id,
             "content": text,
             "link": f"https://indiankanoon.org/doc/{doc_id}/"
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to retrieve document: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to retrieve document: {str(e)}")
 
         @app.get("/extra")
         async def extra_endpoint():
             return {"message": "This is an extra endpoint."}
+
+        # Another simple endpoint
+        @app.get("/another")
+        async def another_endpoint():
+            return {"message": "This is another endpoint."}
 
 if __name__ == "__main__":
     uvicorn.run(app, host="localhost", port=8000)

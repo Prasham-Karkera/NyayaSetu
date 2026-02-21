@@ -50,7 +50,7 @@ export function ComparatorView() {
     setError(null);
 
     try {
-      const response = await fetch("http://localhost:8000/compare", {
+      const response = await fetch("http://localhost:8001/compare", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
